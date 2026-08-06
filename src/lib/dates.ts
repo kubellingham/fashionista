@@ -18,3 +18,22 @@ export function formatDateKey(key: string): string {
     day: 'numeric',
   });
 }
+
+/** The next `n` day keys starting today. */
+export function nextDayKeys(n: number): string[] {
+  const days: string[] = [];
+  const d = new Date();
+  for (let i = 0; i < n; i++) {
+    days.push(toDateKey(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return days;
+}
+
+/** "Today" / "Tomorrow" / "Thu, Aug 9" — friendlier labels for the planner. */
+export function dayLabel(key: string): string {
+  const days = nextDayKeys(2);
+  if (key === days[0]) return 'Today';
+  if (key === days[1]) return 'Tomorrow';
+  return formatDateKey(key);
+}

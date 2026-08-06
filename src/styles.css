@@ -505,6 +505,64 @@ textarea.input {
   flex-shrink: 0;
 }
 
+/* ---------- Week-ahead planner ---------- */
+.day-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.day-row.today {
+  border-color: var(--accent);
+}
+
+.day-label {
+  width: 86px;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.day-row.today .day-label {
+  color: var(--accent);
+}
+
+.day-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plan-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-chip-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.warn {
+  color: #ffb04f;
+  font-size: 0.78rem;
+}
+
+.outfit-card.full-width {
+  width: 100%;
+  text-align: left;
+}
+
 /* ---------- Stats ---------- */
 .stat-tiles {
   display: grid;
