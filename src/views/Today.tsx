@@ -7,20 +7,15 @@ import { useUI } from '../ui';
 import { Swatch } from '../components/shared';
 import { LoggerSheet, MiniSwatch, PlanDaySheet, useWearLook } from '../components/sheets';
 import { CalendarIcon, CheckIcon, ChevronIcon, DropIcon, PencilIcon, XIcon } from '../components/icons';
+import { ItemFormSheet } from './Closet';
+import { LookFormSheet } from './Looks';
 
 /**
  * The redesign's home screen: today's plan with one-tap logging, care
  * and tomorrow at a glance, and the journal of logged days.
+ * Form sheets open in place, per the design — the tab never changes.
  */
-export function Today({
-  goTab,
-  onAddItem,
-  onComposeLook,
-}: {
-  goTab: (tab: string) => void;
-  onAddItem: () => void;
-  onComposeLook: () => void;
-}) {
+export function Today({ goTab }: { goTab: (tab: string) => void }) {
   const { toast, ask } = useUI();
   const wear = useWearLook();
   const items = useLiveQuery(() => db.items.toArray(), []) ?? [];
@@ -29,6 +24,8 @@ export function Today({
   const plans = useLiveQuery(() => db.plans.toArray(), []) ?? [];
   const [logging, setLogging] = useState(false);
   const [planning, setPlanning] = useState(false);
+  const [addingItem, setAddingItem] = useState(false);
+  const [composingLook, setComposingLook] = useState(false);
   const [showAllJournal, setShowAllJournal] = useState(false);
 
   const [T, TM] = nextDayKeys(2);
@@ -72,7 +69,7 @@ export function Today({
             Photograph what you own, one piece at a time. Everything stays on this device — no
             account, no cloud.
           </p>
-          <button className="pill primary" onClick={onAddItem}>Add your first piece</button>
+          <button className="pill primary" onClick={() => setAddingItem(true)}>Add your first piece</button>
         </div>
       )}
 
@@ -271,10 +268,12 @@ export function Today({
           onClose={() => setPlanning(false)}
           onComposeLook={() => {
             setPlanning(false);
-            onComposeLook();
+            setComposingLook(true);
           }}
         />
       )}
+      {addingItem && <ItemFormSheet onClose={() => setAddingItem(false)} />}
+      {composingLook && <LookFormSheet onClose={() => setComposingLook(false)} />}
     </div>
   );
 }

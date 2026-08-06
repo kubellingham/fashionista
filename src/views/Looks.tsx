@@ -1,36 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { STATUS_LABELS, STATUS_PILL, type Item, type Look } from '../types';
 import { dayName, nextDayKeys, todayKey } from '../lib/dates';
 import { notCleanIn, readiness } from '../lib/logic';
 import { useUI } from '../ui';
-import { PickerGrid, Sheet, Swatch, useSwatch } from '../components/shared';
+import { PickerGrid, Sheet, Swatch, useOnce, useSwatch } from '../components/shared';
 import { MiniSwatch, PlanDaySheet, useWearLook } from '../components/sheets';
 import { PlusIcon } from '../components/icons';
 
 /** Looks: the visual week strip planner plus the outfit library. */
-export function Looks({
-  composeSignal,
-  onComposeConsumed,
-}: {
-  composeSignal: number;
-  onComposeConsumed: () => void;
-}) {
-  const looks = useLiveQuery(() => db.outfits.orderBy('createdAt').reverse().toArray(), []) ?? [];
+export function Looks() {
+  const looks = useLiveQuery(() => db.outfits.orderBy('createdAt').toArray(), []) ?? [];
   const items = useLiveQuery(() => db.items.toArray(), []) ?? [];
   const wears = useLiveQuery(() => db.wears.toArray(), []) ?? [];
   const plans = useLiveQuery(() => db.plans.toArray(), []) ?? [];
   const [editing, setEditing] = useState<Look | 'new' | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [planningDay, setPlanningDay] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (composeSignal > 0) {
-      setEditing('new');
-      onComposeConsumed();
-    }
-  }, [composeSignal, onComposeConsumed]);
 
   const itemById = new Map(items.map((i) => [i.id!, i]));
   const week = nextDayKeys(7);
@@ -282,28 +269,32 @@ function LookDetailSheet({
   );
 }
 
-function LookFormSheet({ look, onClose }: { look?: Look; onClose: () => void }) {
+export function LookFormSheet({ look, onClose }: { look?: Look; onClose: () => void }) {
   const { toast } = useUI();
   const items = useLiveQuery(() => db.items.toArray(), []) ?? [];
   const [name, setName] = useState(look?.name ?? '');
   const [selected, setSelected] = useState<number[]>(look?.itemIds ?? []);
 
+  // Ignore ids whose items no longer exist (defense for pre-cleanup data),
+  // so the count matches the visible tiles and stale ids aren't re-saved.
+  const validSelected = selected.filter((id) => items.some((i) => i.id === id));
+
   const toggle = (id: number) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  const save = async () => {
-    if (!name.trim() || selected.length === 0) {
+  const save = useOnce(async () => {
+    if (!name.trim() || validSelected.length === 0) {
       toast('Name the look and pick pieces');
       return;
     }
     if (look?.id) {
-      await db.outfits.update(look.id, { name: name.trim(), itemIds: [...selected] });
+      await db.outfits.update(look.id, { name: name.trim(), itemIds: [...validSelected] });
     } else {
-      await db.outfits.add({ name: name.trim(), itemIds: [...selected], createdAt: Date.now() });
+      await db.outfits.add({ name: name.trim(), itemIds: [...validSelected], createdAt: Date.now() });
     }
     onClose();
     toast('Look saved');
-  };
+  });
 
   return (
     <Sheet title={look ? 'Edit look' : 'New look'} onClose={onClose}>
@@ -316,7 +307,7 @@ function LookFormSheet({ look, onClose }: { look?: Look; onClose: () => void }) 
       />
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '16px 0 8px' }}>
         <div className="field-label" style={{ margin: 0 }}>Pieces</div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac)' }}>{selected.length} selected</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac)' }}>{validSelected.length} selected</div>
       </div>
       <PickerGrid items={items} selected={selected} onToggle={toggle} />
       <button className="pill primary block" style={{ marginTop: 18 }} onClick={save}>

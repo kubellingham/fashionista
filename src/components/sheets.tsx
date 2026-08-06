@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import type { Item, Look } from '../types';
 import { dayName, formatDateKey, todayKey } from '../lib/dates';
 import { planLook, readiness, wearLook } from '../lib/logic';
 import { useUI } from '../ui';
-import { PickerGrid, Sheet, Toggle, useSwatch } from './shared';
+import { PickerGrid, Sheet, Toggle, useOnce, useSwatch } from './shared';
 import { ChevronIcon } from './icons';
 
 /** 2×2 mini thumbnail block used on look rows. */
@@ -73,11 +73,11 @@ export function PlanDaySheet({
   const choices = looks.filter((l) => !current || l.id !== current.id);
   const title = `${dayName(date)} · ${formatDateKey(date).replace(/^[^,]+, /, '')}`;
 
-  const pick = async (look: Look) => {
+  const pick = useOnce(async (look: Look) => {
     await planLook(date, look.id!);
     onClose();
     toast(`Planned for ${dayName(date)}`);
-  };
+  });
 
   const remove = async () => {
     await db.plans.where('date').equals(date).delete();
@@ -152,7 +152,11 @@ export function LoggerSheet({ onClose }: { onClose: () => void }) {
   const toggle = (id: number) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  const save = async () => {
+  const save = useOnce(async () => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > todayKey()) {
+      toast('Pick a valid date — today or earlier');
+      return;
+    }
     if (selected.length === 0) {
       toast('Pick at least one piece');
       return;
@@ -163,7 +167,7 @@ export function LoggerSheet({ onClose }: { onClose: () => void }) {
     }
     onClose();
     toast(toCare ? `Logged — ${selected.length} to Care` : 'Day logged');
-  };
+  });
 
   return (
     <Sheet title="Log a day" onClose={onClose}>
@@ -188,11 +192,19 @@ export function LoggerSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Shared "wear a look now" helper with the design's toast copy. */
+/** Shared "wear a look now" helper with the design's toast copy.
+ * Re-entrant taps are ignored while the write is in flight. */
 export function useWearLook() {
   const { toast } = useUI();
+  const busy = useRef(false);
   return async (look: Look, date: string) => {
-    await wearLook(look, date);
-    toast(`Logged — ${look.itemIds.length} piece${look.itemIds.length === 1 ? '' : 's'} to Care`);
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      await wearLook(look, date);
+      toast(`Logged — ${look.itemIds.length} piece${look.itemIds.length === 1 ? '' : 's'} to Care`);
+    } finally {
+      busy.current = false;
+    }
   };
 }

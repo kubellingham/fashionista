@@ -12,39 +12,31 @@ import {
 } from '../types';
 import { resizePhoto } from '../lib/image';
 import { gradientFor } from '../lib/colors';
-import { lastWornText, money, wearCount } from '../lib/logic';
+import { deleteItemEverywhere, lastWornText, money, wearCount } from '../lib/logic';
 import { useUI } from '../ui';
-import { Sheet, useSwatch } from '../components/shared';
+import { Sheet, useOnce, useSwatch } from '../components/shared';
 import { CameraIcon, PlusIcon, SearchIcon } from '../components/icons';
 
 /** The wardrobe catalog: search, category chips, editorial item cards. */
-export function Closet({
-  addSignal,
-  onAddConsumed,
-}: {
-  addSignal: number;
-  onAddConsumed: () => void;
-}) {
-  const items = useLiveQuery(() => db.items.orderBy('createdAt').reverse().toArray(), []) ?? [];
+export function Closet() {
+  const items = useLiveQuery(() => db.items.orderBy('createdAt').toArray(), []) ?? [];
   const wears = useLiveQuery(() => db.wears.toArray(), []) ?? [];
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState<Category | 'all'>('all');
   const [detailId, setDetailId] = useState<number | null>(null);
   const [editing, setEditing] = useState<Item | 'new' | null>(null);
 
-  // The Today screen's "Add your first piece" lands here with an open form.
-  // The signal is cleared once consumed so revisiting the tab stays clean.
-  useEffect(() => {
-    if (addSignal > 0) {
-      setEditing('new');
-      onAddConsumed();
-    }
-  }, [addSignal, onAddConsumed]);
-
   const totalValue = items.reduce((t, i) => t + (Number(i.price) || 0), 0);
   const counts: Partial<Record<Category, number>> = {};
   for (const i of items) counts[i.category] = (counts[i.category] ?? 0) + 1;
   const cats: (Category | 'all')[] = ['all', ...CATEGORIES.filter((c) => counts[c])];
+
+  // If the active category empties (last item deleted or re-categorized),
+  // fall back to All instead of stranding on an invisible filter.
+  useEffect(() => {
+    if (cat !== 'all' && items.length > 0 && !counts[cat]) setCat('all');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, cat]);
 
   const q = search.toLowerCase();
   const shown = items
@@ -254,10 +246,10 @@ function ItemDetailSheet({
           onClick={() =>
             ask(
               `Delete “${item.name}”?`,
-              'Its wear history stays in your journal.',
+              'It comes off any looks; its wear history stays in your journal.',
               'Delete',
               async () => {
-                await db.items.delete(item.id!);
+                await deleteItemEverywhere(item.id!);
                 onClose();
                 toast('Removed from closet');
               },
@@ -271,7 +263,7 @@ function ItemDetailSheet({
   );
 }
 
-function ItemFormSheet({ item, onClose }: { item?: Item; onClose: () => void }) {
+export function ItemFormSheet({ item, onClose }: { item?: Item; onClose: () => void }) {
   const { toast } = useUI();
   const [name, setName] = useState(item?.name ?? '');
   const [category, setCategory] = useState<Category>(item?.category ?? 'tops');
@@ -295,10 +287,14 @@ function ItemFormSheet({ item, onClose }: { item?: Item; onClose: () => void }) 
 
   const onPhotoChange = async (file: File | undefined) => {
     if (!file) return;
-    setPhoto(await resizePhoto(file));
+    try {
+      setPhoto(await resizePhoto(file));
+    } catch {
+      toast('Couldn’t read that photo — try a JPG or PNG');
+    }
   };
 
-  const save = async () => {
+  const save = useOnce(async () => {
     if (!name.trim()) {
       toast('Give it a name first');
       return;
@@ -320,7 +316,7 @@ function ItemFormSheet({ item, onClose }: { item?: Item; onClose: () => void }) 
     }
     onClose();
     toast(item ? 'Changes saved' : 'Added to your closet');
-  };
+  });
 
   const dropStyle = photoUrl
     ? { backgroundImage: `url(${photoUrl})`, border: '1.5px solid var(--line)' }

@@ -4,6 +4,8 @@ import { Closet } from './views/Closet';
 import { Looks } from './views/Looks';
 import { Care } from './views/Care';
 import { Insights } from './views/Insights';
+import { db } from './db';
+import { todayKey } from './lib/dates';
 import { ACCENT_OPTIONS, DEFAULT_ACCENT } from './types';
 import { exportBackup, importBackup } from './lib/backup';
 import { useUI } from './ui';
@@ -29,15 +31,17 @@ export default function App() {
     const saved = localStorage.getItem(ACCENT_KEY);
     return ACCENT_OPTIONS.some((o) => o.value === saved) ? saved! : DEFAULT_ACCENT;
   });
-  // Cross-tab intents: Today's CTAs land on Closet/Looks with a sheet open.
-  const [addItemSignal, setAddItemSignal] = useState(0);
-  const [composeSignal, setComposeSignal] = useState(0);
-
   useEffect(() => {
     document.documentElement.style.setProperty('--ac', accent);
     localStorage.setItem(ACCENT_KEY, accent);
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#f6f3ec');
   }, [accent]);
+
+  // The planner only looks forward — sweep plans for days already gone
+  // so the "N planned" count never drifts from what the week shows.
+  useEffect(() => {
+    db.plans.where('date').below(todayKey()).delete();
+  }, []);
 
   return (
     <div className="app">
@@ -49,25 +53,9 @@ export default function App() {
       </header>
 
       <main className="app-main">
-        {tab === 'today' && (
-          <Today
-            goTab={(t) => setTab(t as TabKey)}
-            onAddItem={() => {
-              setTab('closet');
-              setAddItemSignal((n) => n + 1);
-            }}
-            onComposeLook={() => {
-              setTab('looks');
-              setComposeSignal((n) => n + 1);
-            }}
-          />
-        )}
-        {tab === 'closet' && (
-          <Closet addSignal={addItemSignal} onAddConsumed={() => setAddItemSignal(0)} />
-        )}
-        {tab === 'looks' && (
-          <Looks composeSignal={composeSignal} onComposeConsumed={() => setComposeSignal(0)} />
-        )}
+        {tab === 'today' && <Today goTab={(t) => setTab(t as TabKey)} />}
+        {tab === 'closet' && <Closet />}
+        {tab === 'looks' && <Looks />}
         {tab === 'care' && <Care />}
         {tab === 'insights' && <Insights />}
       </main>

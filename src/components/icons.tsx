@@ -95,7 +95,19 @@ export const CameraIcon = (p: IconProps) => (
   </svg>
 );
 export const CalendarIcon = (p: IconProps) => (
-  <Stroke {...p} d="M4 5.5h16v15H4z M4 10.5h16M8.5 3.5v4M15.5 3.5v4" />
+  <svg
+    width={p.size ?? 16}
+    height={p.size ?? 16}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={p.color ?? 'currentColor'}
+    strokeWidth={p.strokeWidth ?? 1.8}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="4" y="5.5" width="16" height="15" rx="3" />
+    <path d="M4 10.5h16M8.5 3.5v4M15.5 3.5v4" />
+  </svg>
 );
 export const SparkleIcon = (p: IconProps) => (
   <Stroke

@@ -49,16 +49,37 @@ export function readiness(look: Look, itemById: Map<number, Item>): Readiness {
 
 /** Log a look as worn: journal entry, pieces to Care, that day's plan cleared. */
 export async function wearLook(look: Look, date: string): Promise<void> {
-  await db.wears.add({ date, itemIds: [...look.itemIds], outfitId: look.id });
-  await db.items.where('id').anyOf(look.itemIds).modify({ status: 'dirty' });
-  const dayPlans = await db.plans.where('date').equals(date).toArray();
-  for (const p of dayPlans) {
-    if (p.outfitId === look.id) await db.plans.delete(p.id!);
-  }
+  await db.transaction('rw', [db.wears, db.items, db.plans], async () => {
+    await db.wears.add({ date, itemIds: [...look.itemIds], outfitId: look.id });
+    await db.items.where('id').anyOf(look.itemIds).modify({ status: 'dirty' });
+    await db.plans.where('date').equals(date).and((p) => p.outfitId === look.id).delete();
+  });
 }
 
-/** Plan a look for a date, replacing any existing plan that day. */
+/** Plan a look for a date, atomically replacing any existing plan that day. */
 export async function planLook(date: string, lookId: number): Promise<void> {
-  await db.plans.where('date').equals(date).delete();
-  await db.plans.add({ date, outfitId: lookId });
+  await db.transaction('rw', db.plans, async () => {
+    await db.plans.where('date').equals(date).delete();
+    await db.plans.add({ date, outfitId: lookId });
+  });
+}
+
+/** Delete an item and scrub its id from every look; empty looks (and their
+ * plans) are removed too. Wear history intentionally keeps the id so the
+ * journal still shows the day, as "removed piece". */
+export async function deleteItemEverywhere(itemId: number): Promise<void> {
+  await db.transaction('rw', [db.items, db.outfits, db.plans], async () => {
+    const looks = await db.outfits.toArray();
+    for (const lk of looks) {
+      if (!lk.itemIds.includes(itemId)) continue;
+      const rest = lk.itemIds.filter((x) => x !== itemId);
+      if (rest.length > 0) {
+        await db.outfits.update(lk.id!, { itemIds: rest });
+      } else {
+        await db.plans.where('outfitId').equals(lk.id!).delete();
+        await db.outfits.delete(lk.id!);
+      }
+    }
+    await db.items.delete(itemId);
+  });
 }

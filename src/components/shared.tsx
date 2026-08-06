@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Item } from '../types';
 import { gradientFor } from '../lib/colors';
 import { XIcon, CheckIcon } from './icons';
@@ -6,21 +6,47 @@ import { XIcon, CheckIcon } from './icons';
 /**
  * Every item tile in the app renders through Swatch: the photo when one
  * exists, otherwise a two-tone gradient derived from the color name.
+ * The object URL is created inside the effect (not during render) so
+ * StrictMode double-renders neither leak URLs nor revoke one still in use.
  */
 export function useSwatch(item: Item | undefined): CSSProperties {
-  const url = useMemo(
-    () => (item?.photo ? URL.createObjectURL(item.photo) : undefined),
-    [item?.photo],
-  );
+  const photo = item?.photo;
+  const [url, setUrl] = useState<string | undefined>();
+
   useEffect(() => {
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [url]);
+    if (!photo) {
+      setUrl(undefined);
+      return;
+    }
+    const u = URL.createObjectURL(photo);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [photo]);
 
   if (!item) return { background: '#efe9db' };
-  if (url) return { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+  if (photo) {
+    return url
+      ? { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+      : { background: '#efe9db' };
+  }
   return { background: gradientFor(item.color || item.name) };
+}
+
+/**
+ * Wraps an async handler so re-entrant taps are ignored while the first
+ * is still writing — the guard against double-tap duplicate records.
+ */
+export function useOnce<A extends unknown[]>(fn: (...args: A) => Promise<void> | void) {
+  const busy = useRef(false);
+  return async (...args: A) => {
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      await fn(...args);
+    } finally {
+      busy.current = false;
+    }
+  };
 }
 
 export function Swatch({ item, className, style }: { item?: Item; className?: string; style?: CSSProperties }) {
