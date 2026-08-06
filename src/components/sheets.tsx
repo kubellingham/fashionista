@@ -100,7 +100,7 @@ export function PlanDaySheet({
         >
           <div style={{ display: 'flex' }}>
             {current.itemIds.slice(0, 3).map((id, j) => (
-              <MiniSwatch key={id} item={itemById.get(id)} size={24} radius={999} border="2px solid #f6f3ec" overlap={j > 0} />
+              <MiniSwatch key={id} item={itemById.get(id)} size={24} radius={999} border="2px solid var(--paper)" overlap={j > 0} />
             ))}
           </div>
           <div style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>{current.name}</div>

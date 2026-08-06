@@ -222,7 +222,7 @@ function ItemDetailSheet({
               style={{
                 background: on ? bg : 'var(--card)',
                 color: on ? fg : 'var(--muted)',
-                border: `1px solid ${on ? 'transparent' : '#e0d8c6'}`,
+                border: `1px solid ${on ? 'transparent' : 'var(--input-bd)'}`,
               }}
               onClick={() => db.items.update(item.id!, { status: s })}
             >

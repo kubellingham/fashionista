@@ -80,7 +80,7 @@ export function Looks() {
               {look ? (
                 <div className="mini-stack">
                   {look.itemIds.slice(0, 3).map((id, j) => (
-                    <MiniSwatch key={id} item={itemById.get(id)} size={16} radius={999} border="1.5px solid #fffdf8" overlap={j > 0} />
+                    <MiniSwatch key={id} item={itemById.get(id)} size={16} radius={999} border="1.5px solid var(--card)" overlap={j > 0} />
                   ))}
                 </div>
               ) : (
@@ -217,7 +217,7 @@ function LookDetailSheet({
           const item = itemById.get(id);
           const [bg, fg] = item ? STATUS_PILL[item.status] : ['#f1ece0', '#8b8271'];
           return (
-            <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderBottom: '1px solid #f1ebdd' }}>
+            <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderBottom: '1px solid var(--hairline)' }}>
               <MiniSwatch item={item} size={38} radius={9} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700 }}>{item?.name ?? 'removed piece'}</div>

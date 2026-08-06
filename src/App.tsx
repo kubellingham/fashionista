@@ -8,8 +8,9 @@ import { db } from './db';
 import { todayKey } from './lib/dates';
 import { ACCENT_OPTIONS, DEFAULT_ACCENT } from './types';
 import { exportBackup, importBackup } from './lib/backup';
+import { clearInstallPrompt, getInstallPrompt, isIOS, isStandalone } from './lib/install';
 import { useUI } from './ui';
-import { Sheet } from './components/shared';
+import { Sheet, Toggle } from './components/shared';
 import { BarsIcon, CheckIcon, DotsIcon, DropIcon, HangerIcon, LayersIcon, SunIcon } from './components/icons';
 
 const TABS = [
@@ -23,6 +24,7 @@ const TABS = [
 type TabKey = (typeof TABS)[number]['key'];
 
 const ACCENT_KEY = 'fashionista-accent';
+const THEME_KEY = 'fashionista-theme';
 
 export default function App() {
   const [tab, setTab] = useState<TabKey>('today');
@@ -31,11 +33,27 @@ export default function App() {
     const saved = localStorage.getItem(ACCENT_KEY);
     return ACCENT_OPTIONS.some((o) => o.value === saved) ? saved! : DEFAULT_ACCENT;
   });
+  // Dark mode: follows the system preference until the user picks a side
+  // in Settings, then their choice sticks.
+  const [dark, setDark] = useState<boolean>(() => {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === 'dark') return true;
+    if (saved === 'light') return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
   useEffect(() => {
     document.documentElement.style.setProperty('--ac', accent);
     localStorage.setItem(ACCENT_KEY, accent);
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#f6f3ec');
   }, [accent]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light');
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', dark ? '#1b1813' : '#f6f3ec');
+  }, [dark]);
 
   // The planner only looks forward — sweep plans for days already gone
   // so the "N planned" count never drifts from what the week shows.
@@ -76,7 +94,13 @@ export default function App() {
       </nav>
 
       {settingsOpen && (
-        <SettingsSheet accent={accent} setAccent={setAccent} onClose={() => setSettingsOpen(false)} />
+        <SettingsSheet
+          accent={accent}
+          setAccent={setAccent}
+          dark={dark}
+          setDark={setDark}
+          onClose={() => setSettingsOpen(false)}
+        />
       )}
     </div>
   );
@@ -85,14 +109,36 @@ export default function App() {
 function SettingsSheet({
   accent,
   setAccent,
+  dark,
+  setDark,
   onClose,
 }: {
   accent: string;
   setAccent: (v: string) => void;
+  dark: boolean;
+  setDark: (v: boolean) => void;
   onClose: () => void;
 }) {
   const { toast, ask } = useUI();
   const importRef = useRef<HTMLInputElement>(null);
+  const [installHelp, setInstallHelp] = useState(false);
+  const installed = isStandalone();
+
+  const install = async () => {
+    const prompt = getInstallPrompt();
+    if (prompt) {
+      await prompt.prompt();
+      const choice = await prompt.userChoice;
+      clearInstallPrompt();
+      if (choice.outcome === 'accepted') {
+        onClose();
+        toast('Adding to your Home Screen');
+      }
+    } else {
+      // iOS Safari (and some browsers) offer no prompt API — show the steps.
+      setInstallHelp(true);
+    }
+  };
 
   const onImportFile = async (file: File | undefined) => {
     if (!file) return;
@@ -134,6 +180,28 @@ function SettingsSheet({
           </button>
         ))}
       </div>
+
+      <Toggle on={dark} onToggle={() => setDark(!dark)} label="Dark mode" />
+
+      <div className="field-label" style={{ marginTop: 22 }}>App</div>
+      {installed ? (
+        <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--sub)' }}>
+          Installed on this device ✓
+        </p>
+      ) : (
+        <>
+          <button className="pill outline block" style={{ fontWeight: 700 }} onClick={install}>
+            Add to Home Screen
+          </button>
+          {installHelp && (
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, lineHeight: 1.6, color: 'var(--sub)' }}>
+              {isIOS()
+                ? 'In Safari, tap the Share button (the square with an arrow), then choose “Add to Home Screen”.'
+                : 'In your browser’s menu, choose “Add to Home Screen” or “Install app”.'}
+            </p>
+          )}
+        </>
+      )}
 
       <div className="field-label" style={{ marginTop: 22 }}>Data</div>
       <p style={{ margin: '2px 0 0', fontSize: 13, lineHeight: 1.6, color: 'var(--sub)' }}>

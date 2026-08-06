@@ -169,7 +169,7 @@ export function Today({ goTab }: { goTab: (tab: string) => void }) {
 
       {notClean.length > 0 && (
         <button className="row-card" style={{ marginTop: 14 }} onClick={() => goTab('care')}>
-          <div className="icon-circle" style={{ background: 'color-mix(in oklab, var(--ac) 10%, #fffdf8)' }}>
+          <div className="icon-circle" style={{ background: 'color-mix(in oklab, var(--ac) 12%, var(--card))' }}>
             <DropIcon size={16} color="var(--ac)" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -219,7 +219,7 @@ export function Today({ goTab }: { goTab: (tab: string) => void }) {
         <div key={entry.id} className="journal-row">
           <div className="journal-stack">
             {entry.itemIds.slice(0, 3).map((id, j) => (
-              <MiniSwatch key={`${entry.id}-${id}`} item={itemById.get(id)} size={26} radius={999} border="2px solid #f6f3ec" overlap={j > 0} />
+              <MiniSwatch key={`${entry.id}-${id}`} item={itemById.get(id)} size={26} radius={999} border="2px solid var(--paper)" overlap={j > 0} />
             ))}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
