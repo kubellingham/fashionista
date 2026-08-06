@@ -14,6 +14,8 @@ export const STATUS_LABELS: Record<ItemStatus, string> = {
 export const CATEGORIES = [
   'tops',
   'bottoms',
+  'underwear',
+  'socks',
   'dresses',
   'outerwear',
   'shoes',
