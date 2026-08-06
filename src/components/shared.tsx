@@ -1,31 +1,37 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Item } from '../types';
-import { STATUS_LABELS } from '../types';
+import { gradientFor } from '../lib/colors';
+import { XIcon, CheckIcon } from './icons';
 
 /**
- * Renders a photo Blob from IndexedDB. Blobs can't go straight into an
- * <img> src — we mint a temporary object URL and revoke it on cleanup
- * so memory doesn't leak as the user scrolls a large closet.
+ * Every item tile in the app renders through Swatch: the photo when one
+ * exists, otherwise a two-tone gradient derived from the color name.
  */
-export function PhotoImg({ blob, alt, className }: { blob?: Blob; alt: string; className?: string }) {
-  const url = useMemo(() => (blob ? URL.createObjectURL(blob) : undefined), [blob]);
+export function useSwatch(item: Item | undefined): CSSProperties {
+  const url = useMemo(
+    () => (item?.photo ? URL.createObjectURL(item.photo) : undefined),
+    [item?.photo],
+  );
   useEffect(() => {
     return () => {
       if (url) URL.revokeObjectURL(url);
     };
   }, [url]);
 
-  if (!url) {
-    return <div className={`photo-placeholder ${className ?? ''}`}>👕</div>;
-  }
-  return <img src={url} alt={alt} className={className} />;
+  if (!item) return { background: '#efe9db' };
+  if (url) return { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+  return { background: gradientFor(item.color || item.name) };
 }
 
-export function StatusChip({ status }: { status: Item['status'] }) {
-  return <span className={`chip status-${status}`}>{STATUS_LABELS[status]}</span>;
+export function Swatch({ item, className, style }: { item?: Item; className?: string; style?: CSSProperties }) {
+  const sw = useSwatch(item);
+  return <div className={className} style={{ ...sw, ...style }} />;
 }
 
-/** Bottom-sheet style modal, the standard mobile pattern for forms. */
+/**
+ * Bottom sheet with the design's spring-up open and animated close.
+ * The close animation runs before onClose actually unmounts it.
+ */
 export function Sheet({
   title,
   onClose,
@@ -35,13 +41,23 @@ export function Sheet({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const [closing, setClosing] = useState(false);
+
+  const close = () => {
+    if (closing) return;
+    setClosing(true);
+    setTimeout(onClose, 230);
+  };
+
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+    <div className={`sheet-backdrop ${closing ? 'closing' : ''}`}>
+      <div className="sheet-dim" onClick={close} />
+      <div className="sheet">
+        <div className="sheet-handle" />
         <header className="sheet-header">
           <h2>{title}</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            ✕
+          <button className="sheet-close" onClick={close} aria-label="Close">
+            <XIcon size={12} />
           </button>
         </header>
         <div className="sheet-body">{children}</div>
@@ -50,41 +66,81 @@ export function Sheet({
   );
 }
 
-/** Multi-select grid of wardrobe items, used for outfits and wear logging. */
-export function ItemPicker({
+/** 3-column multi-select item grid with search — looks & logger sheets. */
+export function PickerGrid({
   items,
   selected,
   onToggle,
 }: {
   items: Item[];
-  selected: Set<number>;
+  selected: number[];
   onToggle: (id: number) => void;
 }) {
-  const [filter, setFilter] = useState('');
-  const shown = items.filter((i) =>
-    filter ? i.name.toLowerCase().includes(filter.toLowerCase()) || i.category.includes(filter.toLowerCase()) : true,
+  const [q, setQ] = useState('');
+  const query = q.toLowerCase();
+  const shown = items.filter(
+    (i) => !query || i.name.toLowerCase().includes(query) || i.category.includes(query),
   );
   return (
     <div>
       <input
-        className="input"
-        placeholder="Search items…"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
+        className="picker-search"
+        placeholder="Search pieces…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
       />
       <div className="picker-grid">
         {shown.map((item) => (
-          <button
+          <PickerTile
             key={item.id}
-            className={`picker-cell ${selected.has(item.id!) ? 'selected' : ''}`}
-            onClick={() => onToggle(item.id!)}
-          >
-            <PhotoImg blob={item.photo} alt={item.name} className="picker-photo" />
-            <span className="picker-name">{item.name}</span>
-          </button>
+            item={item}
+            selected={selected.includes(item.id!)}
+            onToggle={() => onToggle(item.id!)}
+          />
         ))}
-        {shown.length === 0 && <p className="empty-note">No items match.</p>}
       </div>
+      {shown.length === 0 && (
+        <div className="serif-italic-note" style={{ textAlign: 'center', padding: '16px 0', fontSize: 14 }}>
+          No pieces match.
+        </div>
+      )}
     </div>
   );
 }
+
+function PickerTile({
+  item,
+  selected,
+  onToggle,
+}: {
+  item: Item;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  const sw = useSwatch(item);
+  return (
+    <button className={`picker-tile ${selected ? 'sel' : ''}`} onClick={onToggle}>
+      <div className="picker-photo" style={sw}>
+        {selected && (
+          <div className="picker-check">
+            <CheckIcon size={9} color="#fff" strokeWidth={3} />
+          </div>
+        )}
+      </div>
+      <div className="picker-name">{item.name}</div>
+    </button>
+  );
+}
+
+export function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
+  return (
+    <button className="switch-row" onClick={onToggle}>
+      <span>{label}</span>
+      <span className={`switch ${on ? 'on' : ''}`}>
+        <span className="knob" />
+      </span>
+    </button>
+  );
+}
+
+export { CheckIcon };

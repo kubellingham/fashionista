@@ -5,9 +5,11 @@ import { blobToDataUrl, dataUrlToBlob } from './image';
  * Because all data lives on this one device, backups matter.
  * Export bundles everything (photos included, as base64) into one JSON
  * file the user can save anywhere; import restores it on any device.
+ * v2 renames "outfits" to "looks"; import accepts both, so v1 backups
+ * from the original app restore fine.
  */
 export async function exportBackup(): Promise<void> {
-  const [items, outfits, wears, plans] = await Promise.all([
+  const [items, looks, wears, plans] = await Promise.all([
     db.items.toArray(),
     db.outfits.toArray(),
     db.wears.toArray(),
@@ -23,10 +25,10 @@ export async function exportBackup(): Promise<void> {
 
   const payload = {
     app: 'fashionista',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     items: itemsSerialized,
-    outfits,
+    looks,
     wears,
     plans,
   };
@@ -43,7 +45,7 @@ export async function exportBackup(): Promise<void> {
 export async function importBackup(file: File): Promise<void> {
   const payload = JSON.parse(await file.text());
   if (payload.app !== 'fashionista') {
-    throw new Error('Not a Fashionista backup file');
+    throw new Error('not a Fashionista backup');
   }
 
   const items = await Promise.all(
@@ -53,6 +55,7 @@ export async function importBackup(file: File): Promise<void> {
         typeof item.photo === 'string' ? await dataUrlToBlob(item.photo) : undefined,
     })),
   );
+  const looks = payload.looks ?? payload.outfits ?? [];
 
   // Replace everything atomically so a half-imported state is impossible.
   await db.transaction('rw', [db.items, db.outfits, db.wears, db.plans], async () => {
@@ -63,7 +66,7 @@ export async function importBackup(file: File): Promise<void> {
       db.plans.clear(),
     ]);
     await db.items.bulkAdd(items);
-    await db.outfits.bulkAdd(payload.outfits ?? []);
+    await db.outfits.bulkAdd(looks);
     await db.wears.bulkAdd(payload.wears ?? []);
     await db.plans.bulkAdd(payload.plans ?? []);
   });

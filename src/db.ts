@@ -1,14 +1,14 @@
 import Dexie, { type Table } from 'dexie';
-import type { Item, Outfit, WearEntry, PlannedOutfit } from './types';
+import type { Item, Look, WearEntry, PlannedLook } from './types';
 
 // Dexie is a thin wrapper over the browser's IndexedDB.
-// The strings below declare which fields get indexes (fast lookups);
-// '++id' means an auto-incrementing primary key.
+// Table names are unchanged from v1 ("outfits", "plans") so the redesign
+// opens existing wardrobes without any migration.
 class FashionistaDB extends Dexie {
   items!: Table<Item, number>;
-  outfits!: Table<Outfit, number>;
+  outfits!: Table<Look, number>;
   wears!: Table<WearEntry, number>;
-  plans!: Table<PlannedOutfit, number>;
+  plans!: Table<PlannedLook, number>;
 
   constructor() {
     super('fashionista');

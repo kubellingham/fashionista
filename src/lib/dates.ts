@@ -30,10 +30,18 @@ export function nextDayKeys(n: number): string[] {
   return days;
 }
 
-/** "Today" / "Tomorrow" / "Thu, Aug 9" — friendlier labels for the planner. */
-export function dayLabel(key: string): string {
+/** "Today" / "Tomorrow" / "Thursday" — for planner sheet titles and warnings. */
+export function dayName(key: string): string {
   const days = nextDayKeys(2);
   if (key === days[0]) return 'Today';
   if (key === days[1]) return 'Tomorrow';
-  return formatDateKey(key);
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'long' });
+}
+
+/** "MONDAY, AUGUST 10" — the Today screen's eyebrow. */
+export function todayEyebrow(): string {
+  return new Date()
+    .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+    .toUpperCase();
 }
